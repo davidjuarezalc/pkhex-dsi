@@ -34,12 +34,19 @@ jobs:
       - name: Setup environment
         run: git config --global safe.directory '*'
 
-      - name: Install graphics conversion tool (bmp2ds)
+      - name: Install build tools
         run: |
-          curl -sL https://raw.githubusercontent.com/Universal-Team/bmp2ds/master/bmp2ds.cpp -o /tmp/bmp2ds.cpp
-          g++ -O2 /tmp/bmp2ds.cpp -o /usr/local/bin/bmp2ds
-          rm /tmp/bmp2ds.cpp
+          if [ -f tools-linux/bmp2ds ]; then
+            cp tools-linux/bmp2ds /usr/local/bin/bmp2ds
+          else
+            curl -sL https://github.com/Universal-Team/bmp2ds/releases/download/v1.0.0/bmp2ds-linux -o /usr/local/bin/bmp2ds
+          fi
           chmod +x /usr/local/bin/bmp2ds
+
+          if [ -f tools-linux/make_cia ]; then
+            cp tools-linux/make_cia /usr/local/bin/make_cia
+            chmod +x /usr/local/bin/make_cia
+          fi
 
       - name: Compile PKHeX DSi
         run: |
@@ -47,15 +54,11 @@ jobs:
           mkdir -p artifacts
           cp -f pkhex_dsi.nds artifacts/ 2>/dev/null || cp -f pkmn-chest.nds artifacts/pkhex_dsi.nds
 
-          if [ -f tools-linux/make_cia ]; then
-            cp tools-linux/make_cia /usr/local/bin/
-            chmod +x /usr/local/bin/make_cia
-            make cia || true
-            if [ -f pkhex_dsi.cia ]; then
-              cp -f pkhex_dsi.cia artifacts/
-            elif [ -f pkmn-chest.cia ]; then
-              cp -f pkmn-chest.cia artifacts/pkhex_dsi.cia
-            fi
+          make cia || true
+          if [ -f pkhex_dsi.cia ]; then
+            cp -f pkhex_dsi.cia artifacts/
+          elif [ -f pkmn-chest.cia ]; then
+            cp -f pkmn-chest.cia artifacts/pkhex_dsi.cia
           fi
 
       - name: Upload Build Artifacts
