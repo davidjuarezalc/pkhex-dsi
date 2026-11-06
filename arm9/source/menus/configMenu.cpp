@@ -8,6 +8,7 @@
 #include "graphics.hpp"
 #include "gui.hpp"
 #include "i18n.hpp"
+#include "i18n_ext.hpp"
 #include "input.hpp"
 #include "manager.hpp"
 #include "misc.hpp"
@@ -19,7 +20,7 @@
 
 #define getChestFile() (Config::getString("chestFile") == "" ? "pkmn-chest_1" : Config::getString("chestFile"))
 
-std::vector<Label> textCP1Labels = {
+static constexpr Label textCP1Labels[] = {
 	{4, 16, "chestFile"},       // Chest file
 	{4, 32, "chestSize"},       // Chest size
 	{4, 48, "language"},        // Language
@@ -30,38 +31,41 @@ std::vector<Label> textCP1Labels = {
 	{4, 128, "dPadGroups"},     // D-Pad typing groups
 	{4, 144, "theme"},          // Theme
 };
+static constexpr unsigned textCP1LabelsCount = sizeof(textCP1Labels) / sizeof(textCP1Labels[0]);
 
-std::vector<Label> textChestFile = {
+static constexpr Label textChestFile[] = {
 	{12, 32, "new"},    // New
 	{12, 48, "rename"}, // Rename
 	{12, 64, "delete"}, // Delete
 	{12, 80, "change"}, // Change
 };
+static constexpr unsigned textChestFileCount = sizeof(textChestFile) / sizeof(textChestFile[0]);
 
-std::vector<std::string> songs = {
+static const char *const songs[] = {
 	"off", "center1", "center3", "center4", "center5", "twinleafTown", "elmLab", "oakLab", "gameCorner", "theme"};
+static constexpr unsigned songsCount = sizeof(songs) / sizeof(songs[0]);
 
 std::vector<std::string> optionsText;
 
-const std::vector<std::string> langNames   = {"Bahasa Indonesia",
-                                            "Bruh",
-                                            "Deutsch",
-                                            "English",
-                                            "Español",
-                                            "Français",
-                                            "Italiano",
-                                            "Lietuvių",
-                                            "Magyar",
-                                            "Polski",
-                                            "Português",
-                                            "Română",
-                                            "Türkçe",
-                                            "Русский",
-                                            "中文 (简体)",
-                                            "中文 (繁體)",
-                                            "日本語",
-                                            "한국어"};
-const std::vector<pksm::Language> guiLangs = {pksm::Language::IND,
+static const char *const langNamesArr[] = {"Bahasa Indonesia",
+										   "Bruh",
+										   "Deutsch",
+										   "English",
+										   "Español",
+										   "Français",
+										   "Italiano",
+										   "Lietuvių",
+										   "Magyar",
+										   "Polski",
+										   "Português",
+										   "Română",
+										   "Türkçe",
+										   "Русский",
+										   "中文 (简体)",
+										   "中文 (繁體)",
+										   "日本語",
+										   "한국어"};
+static constexpr pksm::Language guiLangs[] = {pksm::Language::IND,
 											  pksm::Language::BRH,
 											  pksm::Language::GER,
 											  pksm::Language::ENG,
@@ -79,6 +83,7 @@ const std::vector<pksm::Language> guiLangs = {pksm::Language::IND,
 											  pksm::Language::CHT,
 											  pksm::Language::JPN,
 											  pksm::Language::KOR};
+static constexpr unsigned guiLangsCount = sizeof(guiLangs) / sizeof(guiLangs[0]);
 
 void drawChestFileMenu(void) {
 	// Draw background
@@ -94,7 +99,7 @@ void drawChestFileMenu(void) {
 			  textCP1Labels[0].y,
 			  false,
 			  false);
-	for(unsigned i = 0; i < textChestFile.size(); i++) {
+	for(unsigned i = 0; i < textChestFileCount; i++) {
 		printText(i18n::localize(Config::getLang("lang"), textChestFile[i].label),
 				  textChestFile[i].x,
 				  textChestFile[i].y,
@@ -130,7 +135,7 @@ void chestFileMenu(void) {
 			if(selection > 0)
 				selection--;
 		} else if(held & KEY_DOWN) {
-			if(selection < (int)(textChestFile.size()) - 1)
+			if(selection < (int)textChestFileCount - 1)
 				selection++;
 		} else if(pressed & KEY_A) {
 			optionSelected = true;
@@ -140,7 +145,7 @@ void chestFileMenu(void) {
 			return;
 		} else if(pressed & KEY_TOUCH) {
 			touchRead(&touch);
-			for(unsigned i = 0; i < textChestFile.size(); i++) {
+			for(unsigned i = 0; i < textChestFileCount; i++) {
 				if(touch.px >= textChestFile[i].x &&
 				   touch.px <= textChestFile[i].x +
 						   getTextWidth(i18n::localize(Config::getLang("lang"), textChestFile[i].label)) &&
@@ -230,16 +235,18 @@ void drawConfigMenu(void) {
 	drawImageDMA(0, 0, listBg, false, false);
 	printText(i18n::localize(Config::getLang("lang"), "options"), 4, 0, false, false);
 
-	if(optionsText.size() < textCP1Labels.size()) {
-		optionsText.resize(textCP1Labels.size());
+	if(optionsText.size() < textCP1LabelsCount) {
+		optionsText.resize(textCP1LabelsCount);
 	}
 
 	// Set variable text
 	optionsText[0] = Banks::bank->name();
 	optionsText[1] = std::to_string(Banks::bank->boxes());
-	int currentLang =
-		std::distance(guiLangs.begin(), std::find(guiLangs.begin(), guiLangs.end(), Config::getLang("lang")));
-	optionsText[2] = langNames[currentLang];
+	int currentLang = std::distance(
+		guiLangs, std::find(guiLangs, guiLangs + guiLangsCount, Config::getLang("lang")));
+	if(currentLang < 0 || currentLang >= (int)guiLangsCount)
+		currentLang = 3; // English fallback
+	optionsText[2] = langNamesArr[currentLang];
 	if(Config::getInt("backupAmount") == 0)
 		optionsText[3] = i18n::localize(Config::getLang("lang"), "unlimited");
 	else
@@ -258,7 +265,7 @@ void drawConfigMenu(void) {
 									 : Config::getString("themeDir").find_last_of("/") + 1);
 
 	// Print text
-	for(unsigned i = 0; i < textCP1Labels.size(); i++) {
+	for(unsigned i = 0; i < textCP1LabelsCount; i++) {
 		printText(i18n::localize(Config::getLang("lang"), textCP1Labels[i].label) + ":",
 				  textCP1Labels[i].x,
 				  textCP1Labels[i].y,
@@ -351,20 +358,23 @@ void configMenu(void) {
 				}
 				case 2: { // Language
 					int currentLang = std::distance(
-						guiLangs.begin(), std::find(guiLangs.begin(), guiLangs.end(), Config::getLang("lang")));
+						guiLangs, std::find(guiLangs, guiLangs + guiLangsCount, Config::getLang("lang")));
+					if(currentLang < 0 || currentLang >= (int)guiLangsCount)
+						currentLang = 3;
 					if(pressed & KEY_LEFT) {
 						if(currentLang > 0) {
 							Config::setLang("lang", guiLangs[currentLang - 1]);
 						} else {
-							Config::setLang("lang", guiLangs[guiLangs.size() - 1]);
+							Config::setLang("lang", guiLangs[guiLangsCount - 1]);
 						}
 					} else if(pressed & KEY_RIGHT) {
-						if(currentLang < (int)guiLangs.size() - 1) {
+						if(currentLang < (int)guiLangsCount - 1) {
 							Config::setLang("lang", guiLangs[currentLang + 1]);
 						} else {
 							Config::setLang("lang", guiLangs[0]);
 						}
 					} else {
+						std::vector<std::string> langNames(langNamesArr, langNamesArr + guiLangsCount);
 						int num = selectItem<int>(currentLang, 0, langNames.size(), langNames);
 						if(num != -1) {
 							Config::setLang("lang", guiLangs[num]);
@@ -373,6 +383,7 @@ void configMenu(void) {
 
 					i18n::exit();
 					i18n::init(Config::getLang("lang"));
+					i18n::updateTMHMNames(Config::getLang("lang"));
 					loadTypes(Config::getLang("lang"));
 					break;
 				}
@@ -392,7 +403,7 @@ void configMenu(void) {
 				}
 				case 4: { // Music
 					int current = 0;
-					for(unsigned int i = 0; i < songs.size(); i++) {
+					for(unsigned int i = 0; i < songsCount; i++) {
 						if(songs[i] == Config::getString("music")) {
 							current = i;
 							break;
@@ -403,16 +414,16 @@ void configMenu(void) {
 						if(current > 0)
 							Config::setString("music", songs[current - 1]);
 						else
-							Config::setString("music", songs[songs.size() - 1]);
+							Config::setString("music", songs[songsCount - 1]);
 					} else if(pressed & KEY_RIGHT) {
-						if(current < (int)songs.size() - 1)
+						if(current < (int)songsCount - 1)
 							Config::setString("music", songs[current + 1]);
 						else
 							Config::setString("music", songs[0]);
 					} else {
 						std::vector<std::string> names;
-						for(auto str : songs) {
-							names.push_back(i18n::localize(Config::getLang("lang"), str));
+						for(unsigned i = 0; i < songsCount; i++) {
+							names.push_back(i18n::localize(Config::getLang("lang"), songs[i]));
 						}
 						Config::setString("music", songs[selectItem<int>(current, 0, names.size(), names)]);
 					}

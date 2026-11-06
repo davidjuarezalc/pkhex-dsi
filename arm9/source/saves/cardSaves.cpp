@@ -9,7 +9,7 @@ sNDSHeader nds;
 char slot1Name[13];
 char slot1ID[5];
 
-const std::vector<std::string> goodTids = {
+static const char *const goodTids[] = {
 	"ADA", // Diamond
 	"APA", // Pearl
 	"CPU", // Platinum
@@ -22,8 +22,8 @@ const std::vector<std::string> goodTids = {
 };
 
 bool isValidDSTid(char *tid) {
-	for(unsigned i = 0; i < goodTids.size(); i++) {
-		if(strncmp(tid, goodTids[i].c_str(), 3) == 0)
+	for(unsigned i = 0; i < sizeof(goodTids) / sizeof(goodTids[0]); i++) {
+		if(strncmp(tid, goodTids[i], 3) == 0)
 			return true;
 	}
 	return false;
@@ -32,7 +32,9 @@ bool isValidDSTid(char *tid) {
 bool updateCardInfo(void) { return updateCardInfo(&nds, slot1ID, slot1Name, &card_type); }
 
 bool updateCardInfo(sNDSHeader *nds, char *gameid, char *gamename, auxspi_extra *card_type) {
-	cardReadHeader((uint8 *)nds);
+	alignas(4) uint8 headerBuf[0x200];
+	cardReadHeader(headerBuf);
+	memcpy(nds, headerBuf, sizeof(sNDSHeader));
 	*card_type = auxspi_has_extra();
 	int type   = cardEepromGetType();
 	int size   = cardEepromGetSize();

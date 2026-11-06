@@ -41,7 +41,7 @@ Text textC2[] = {
 };
 
 int summaryPage                        = 0;
-std::vector<std::string> summaryLabels = {"species",
+static const char * const summaryLabels[] = {"species",
 										  "level",
 										  "ability",
 										  "nature",
@@ -54,77 +54,95 @@ std::vector<std::string> summaryLabels = {"species",
 										  "friendship"};
 
 void changeAbility(pksm::PKX &pkm) {
-	switch(pkm.generation()) {
-		case pksm::Generation::THREE:
-		case pksm::Generation::FOUR: {
-			pksm::Ability setAbility = pkm.ability();
-			if(pkm.abilities(0) != setAbility && pkm.abilities(0) != pksm::Ability::None) {
-				pkm.setAbility(0);
-			} else if(pkm.abilities(1) != pksm::Ability::None) {
-				pkm.setAbility(1);
-			} else { // Just in case
-				pkm.setAbility(0);
-			}
-			break;
+	pksm::Language lang = Config::getLang("lang");
+
+	// Native abilities
+	pksm::Ability native1 = pkm.abilities(0);
+	pksm::Ability native2 = pkm.abilities(1);
+	pksm::Ability hiddenAbil = pksm::Ability::None;
+
+	if(pkm.generation() == pksm::Generation::FIVE) {
+		hiddenAbil = pkm.abilities(2);
+	} else {
+		hiddenAbil = pksm::PersonalBWB2W2::ability(pkm.formSpecies(), 2);
+	}
+
+	struct AbilityOption {
+		pksm::Ability ability;
+		std::string label;
+		int slot; // 0: slot 0, 1: slot 1, 2: hidden, -1: other
+	};
+
+	std::vector<AbilityOption> options;
+
+	if(native1 != pksm::Ability::None) {
+		options.push_back({native1, "[1] " + i18n::ability(lang, native1), 0});
+	}
+	if(native2 != pksm::Ability::None && native2 != native1) {
+		options.push_back({native2, "[2] " + i18n::ability(lang, native2), 1});
+	}
+	if(hiddenAbil != pksm::Ability::None && hiddenAbil != native1 && hiddenAbil != native2) {
+		options.push_back({hiddenAbil, "[H] " + i18n::ability(lang, hiddenAbil), 2});
+	}
+
+	// Gather and sort all other available abilities in this generation
+	std::vector<AbilityOption> otherAbilities;
+	const std::set<pksm::Ability> &avail = save->availableAbilities();
+	for(auto it = avail.begin(); it != avail.end(); ++it) {
+		pksm::Ability a = *it;
+		if(a == pksm::Ability::None || a == native1 || a == native2 || a == hiddenAbil) {
+			continue;
 		}
-		case pksm::Generation::FIVE: {
+		otherAbilities.push_back({a, i18n::ability(lang, a), -1});
+	}
+
+	std::sort(otherAbilities.begin(), otherAbilities.end(), [](const AbilityOption &a, const AbilityOption &b) {
+		return i18n::compareAlphabetical(a.label, b.label);
+	});
+
+	options.insert(options.end(), otherAbilities.begin(), otherAbilities.end());
+
+	std::vector<std::string> labels;
+	int currentOption = 0;
+	for(size_t i = 0; i < options.size(); i++) {
+		labels.push_back(options[i].label);
+		if(options[i].ability == pkm.ability()) {
+			currentOption = i;
+		}
+	}
+
+	int selectedIdx = selectItem<int>(currentOption, 0, labels.size(), labels);
+	if(selectedIdx >= 0 && selectedIdx < (int)options.size()) {
+		const AbilityOption &chosen = options[selectedIdx];
+		if(pkm.generation() == pksm::Generation::FIVE) {
 			pksm::PK5 *pk5 = (pksm::PK5 *)&pkm;
-			switch(pkm.abilityNumber() >> 1) {
-				case 0:
-					if(pkm.abilities(1) != pkm.ability() && pkm.abilities(1) != pksm::Ability::None) {
-						pkm.setAbility(1);
-						if(pk5->abilities(1) == pk5->abilities(2)) {
-							pk5->hiddenAbility(true);
-						}
-					} else if(pkm.abilities(2) != pksm::Ability::None) {
-						pkm.setAbility(2);
-					}
-					break;
-				case 1:
-					if(pkm.abilities(2) != pkm.ability() && pkm.abilities(2) != pksm::Ability::None) {
-						pkm.setAbility(2);
-					} else if(pkm.abilities(0) != pksm::Ability::None) {
-						pkm.setAbility(0);
-					}
-					break;
-				case 2:
-					if(pkm.abilities(0) != pkm.ability() && pkm.abilities(0) != pksm::Ability::None) {
-						pkm.setAbility(0);
-					} else if(pkm.abilities(1) != pksm::Ability::None) {
-						pkm.setAbility(1);
-						if(pkm.abilities(1) == pkm.abilities(2)) {
-							pk5->hiddenAbility(true);
-						}
-					}
-					break;
+			if(chosen.slot == 0) {
+				pkm.setAbility(0);
+			} else if(chosen.slot == 1) {
+				pkm.setAbility(1);
+			} else if(chosen.slot == 2) {
+				pkm.setAbility(2);
+			} else {
+				// Any custom ability
+				pk5->ability(chosen.ability);
 			}
-			break;
-		}
-		default: {
-			switch(pkm.abilityNumber() >> 1) {
-				case 0:
-					if(pkm.abilities(1) != pkm.ability() && pkm.abilities(1) != pksm::Ability::None) {
-						pkm.setAbility(1);
-					} else if(pkm.abilities(2) != pksm::Ability::None) {
-						pkm.setAbility(2);
-					}
-					break;
-				case 1:
-					if(pkm.abilities(2) != pkm.ability() && pkm.abilities(2) != pksm::Ability::None) {
-						pkm.setAbility(2);
-					} else if(pkm.abilities(0) != pksm::Ability::None) {
-						pkm.setAbility(0);
-					}
-					break;
-				case 2:
-					if(pkm.abilities(0) != pkm.ability() && pkm.abilities(0) != pksm::Ability::None) {
-						pkm.setAbility(0);
-					} else if(pkm.abilities(1) != pksm::Ability::None) {
-						pkm.setAbility(1);
-					}
-					break;
+		} else if(pkm.generation() == pksm::Generation::FOUR) {
+			if(chosen.slot == 0) {
+				pkm.setAbility(0);
+			} else if(chosen.slot == 1) {
+				pkm.setAbility(1);
+			} else {
+				// Slot 2 (Hidden Ability) or custom ability
+				pkm.ability(chosen.ability);
 			}
-			break;
+		} else { // Gen 3 or other
+			if(chosen.slot == 0) {
+				pkm.setAbility(0);
+			} else if(chosen.slot == 1) {
+				pkm.setAbility(1);
+			} else {
+				pkm.ability(chosen.ability);
+			}
 		}
 	}
 }
@@ -171,7 +189,7 @@ void drawSummaryPage(const pksm::PKX &pkm, bool background) {
 		drawRectangle(150, 45, shiny.width, shiny.height, 0, false, true);
 
 	// Print Pokémon and trainer info labels
-	for(unsigned i = 0; i < summaryLabels.size(); i++) {
+	for(unsigned i = 0; i < (sizeof(summaryLabels) / sizeof(summaryLabels[0])); i++) {
 		printTextMaxW(
 			i18n::localize(Config::getLang("lang"), summaryLabels[i]), textC1[i].x - 8, 1, 4, textC1[i].y, false, true);
 	}

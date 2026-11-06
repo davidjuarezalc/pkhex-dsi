@@ -16,9 +16,11 @@
 std::vector<std::string> filterValues;
 std::vector<bool> filterEnabled;
 std::vector<bool> filterInversed;
-std::array<std::string, 3> genders       = {"male", "female", "unknown"};
-std::array<std::string, 10> filterLabels = {
+static const char *const genders[]       = {"male", "female", "unknown"};
+static constexpr unsigned gendersCount   = sizeof(genders) / sizeof(genders[0]);
+static const char *const filterLabels[]  = {
 	"species", "nature", "ability", "gender", "item", "ball", "form", "level", "moves", "shiny"};
+static constexpr unsigned filterLabelsCount = sizeof(filterLabels) / sizeof(filterLabels[0]);
 
 void selectMoves(std::shared_ptr<pksm::PKFilter> filter) {
 	// Clear screen
@@ -68,7 +70,7 @@ void selectMoves(std::shared_ptr<pksm::PKFilter> filter) {
 		} else if(pressed & KEY_TOUCH) {
 			touchRead(&touch);
 			for(unsigned i = 0; i < 4; i++) {
-				if(touch.px >= 4 && touch.px <= 4 + getTextWidth(filter->moveEnabled(selection) ? "o" : "x") &&
+				if(touch.px >= 4 && touch.px <= 4 + getTextWidth(filter->moveEnabled(i) ? "o" : "x") &&
 				   touch.py >= 15 + (i * 16) && touch.py <= 15 + ((i + 1) * 16)) {
 					column         = 0;
 					selection      = i;
@@ -76,14 +78,14 @@ void selectMoves(std::shared_ptr<pksm::PKFilter> filter) {
 					break;
 				}
 				if(touch.px >= 20 &&
-				   touch.px <= 20 + getTextWidth(i18n::move(Config::getLang("lang"), filter->move(selection))) &&
+				   touch.px <= 20 + getTextWidth(i18n::move(Config::getLang("lang"), filter->move(i))) &&
 				   touch.py >= 15 + (i * 16) && touch.py <= 15 + ((i + 1) * 16)) {
 					column         = 1;
 					selection      = i;
 					optionSelected = true;
 					break;
 				}
-				if(touch.px >= 120 && touch.px <= 120 + getTextWidth(filter->moveInversed(selection) ? "≠" : "=") &&
+				if(touch.px >= 120 && touch.px <= 120 + getTextWidth(filter->moveInversed(i) ? "≠" : "=") &&
 				   touch.py >= 15 + (i * 16) && touch.py <= 15 + ((i + 1) * 16)) {
 					column         = 2;
 					selection      = i;
@@ -188,7 +190,7 @@ void drawFilterMenu(const std::shared_ptr<pksm::PKFilter> filter) {
 	filterInversed.push_back(filter->shinyInversed());
 
 	// Print items
-	for(unsigned i = 0; i < filterLabels.size(); i++) {
+	for(unsigned i = 0; i < filterLabelsCount; i++) {
 		printText(filterEnabled[i] ? "o" : "x", 4, 16 + (i * 16), false, false);
 		printTextMaxW(
 			i18n::localize(Config::getLang("lang"), filterLabels[i]), 100, 1, 20, 16 + (i * 16), false, false);
@@ -230,7 +232,7 @@ void changeFilter(std::shared_ptr<pksm::PKFilter> filter) {
 			if(selection > 0)
 				selection--;
 		} else if(held & KEY_DOWN) {
-			if(selection < (int)filterLabels.size() - 1)
+			if(selection < (int)filterLabelsCount - 1)
 				selection++;
 		} else if(pressed & KEY_LEFT) {
 			if(column > 0)
@@ -240,15 +242,15 @@ void changeFilter(std::shared_ptr<pksm::PKFilter> filter) {
 				column++;
 		} else if(pressed & KEY_TOUCH) {
 			touchRead(&touch);
-			for(unsigned i = 0; i < filterLabels.size(); i++) {
-				if(touch.px >= 4 && touch.px <= 4 + getTextWidth(filter->moveEnabled(selection) ? "o" : "x") &&
+			for(unsigned i = 0; i < filterLabelsCount; i++) {
+				if(touch.px >= 4 && touch.px <= 4 + getTextWidth(filterEnabled[i] ? "o" : "x") &&
 				   touch.py >= 15 + (i * 16) && touch.py <= 15 + ((i + 1) * 16)) {
 					column         = 0;
 					selection      = i;
 					optionSelected = true;
 					break;
 				}
-				if(touch.px >= 120 && touch.px <= 120 + getTextWidth(filter->moveInversed(selection) ? "≠" : "=") &&
+				if(touch.px >= 120 && touch.px <= 120 + getTextWidth(filterInversed[i] ? "≠" : "=") &&
 				   touch.py >= 15 + (i * 16) && touch.py <= 15 + ((i + 1) * 16)) {
 					column         = 1;
 					selection      = i;
@@ -256,7 +258,7 @@ void changeFilter(std::shared_ptr<pksm::PKFilter> filter) {
 					break;
 				}
 				if(touch.px >= 136 &&
-				   touch.px <= 136 + getTextWidth(i18n::move(Config::getLang("lang"), filter->move(selection))) &&
+				   touch.px <= 136 + getTextWidth(filterValues[i]) &&
 				   touch.py >= 15 + (i * 16) && touch.py <= 15 + ((i + 1) * 16)) {
 					column         = 2;
 					selection      = i;
@@ -370,8 +372,8 @@ void changeFilter(std::shared_ptr<pksm::PKFilter> filter) {
 						break;
 					}
 					case 3: { // Gender
-						std::vector<std::string> genderList(genders.size());
-						for(unsigned int i = 0; i < genders.size(); i++) {
+						std::vector<std::string> genderList(gendersCount);
+						for(unsigned int i = 0; i < gendersCount; i++) {
 							genderList[i] = i18n::localize(Config::getLang("lang"), genders[i]);
 						}
 						filter->gender(selectItem(filter->gender(), 0, genderList.size(), genderList));
@@ -389,11 +391,15 @@ void changeFilter(std::shared_ptr<pksm::PKFilter> filter) {
 						break;
 					}
 					case 6: { // Alt. form
-						filter->alternativeForm(Input::getInt(28));
+						int form = Input::getInt(28);
+						if(form != -1)
+							filter->alternativeForm(form);
 						break;
 					}
 					case 7: { // Level
-						filter->level(Input::getInt(100));
+						int lvl = Input::getInt(100);
+						if(lvl != -1)
+							filter->level(lvl);
 						break;
 					}
 					case 8: { // Moves

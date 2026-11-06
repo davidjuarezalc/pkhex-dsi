@@ -4,6 +4,8 @@
 #include "Nature.hpp"
 #include "Sav.hpp"
 #include "Type.hpp"
+#include "i18n_ext.hpp"
+#include <algorithm>
 
 // Shows the form selection menu
 int selectForm(const pksm::PKX &pkm);
@@ -15,17 +17,35 @@ std::string selectItem(int current, const std::vector<std::string> &strings);
 template <typename T>
 T selectItem(T current, const std::set<T> &validItems, const std::vector<std::string>& strings) {
 	std::vector<std::string> availableItems;
+	std::string currentStr = "";
+	if((size_t)current < strings.size()) {
+		currentStr = strings[(size_t)current];
+	}
+
 	for(unsigned int i=0;i<strings.size();i++) {
 		if(validItems.count(T(i)) != 0) {
 			availableItems.push_back(strings[i]);
 		}
 	}
 
-	if((int)current < 0)
-		current = T(0);
-	else if((int)current > (int)availableItems.size()-1)
-		current = T(availableItems.size()-1);
-	std::string selection = selectItem((int)current, availableItems);
+	// Sort available items alphabetically, keeping "None" (index 0) at top if present
+	if(availableItems.size() > 1) {
+		auto startIt = availableItems.begin();
+		if(!availableItems.empty() && (availableItems[0].empty() || availableItems[0] == "-----" || availableItems[0] == "None" || availableItems[0] == "---" || availableItems[0] == "Ninguno")) {
+			startIt++;
+		}
+		std::sort(startIt, availableItems.end(), i18n::compareAlphabetical);
+	}
+
+	int currentIndex = 0;
+	for(size_t i = 0; i < availableItems.size(); i++) {
+		if(availableItems[i] == currentStr) {
+			currentIndex = i;
+			break;
+		}
+	}
+
+	std::string selection = selectItem(currentIndex, availableItems);
 
 	for(unsigned int i=0;i<strings.size();i++) {
 		if(strings[i] == selection)	return T(i);
@@ -36,8 +56,31 @@ T selectItem(T current, const std::set<T> &validItems, const std::vector<std::st
 // Shows a list of items in a vector to select from
 template <typename T>
 T selectItem(T current, int start, int max, const std::vector<std::string> &strings) {
-	if((int)current < start || (int)current > max)	current = T(start);
-	std::string selection = selectItem((int)current, std::vector<std::string>(&strings[start], &strings[max]));
+	std::string currentStr = "";
+	if((int)current >= start && (int)current < max && (size_t)current < strings.size()) {
+		currentStr = strings[(size_t)current];
+	}
+
+	std::vector<std::string> availableItems(&strings[start], &strings[max]);
+
+	// Sort available items alphabetically, keeping first item if it is None/placeholder
+	if(availableItems.size() > 1) {
+		auto startIt = availableItems.begin();
+		if(!availableItems.empty() && (availableItems[0].empty() || availableItems[0] == "-----" || availableItems[0] == "None" || availableItems[0] == "---" || availableItems[0] == "Ninguno")) {
+			startIt++;
+		}
+		std::sort(startIt, availableItems.end(), i18n::compareAlphabetical);
+	}
+
+	int currentIndex = 0;
+	for(size_t i = 0; i < availableItems.size(); i++) {
+		if(availableItems[i] == currentStr) {
+			currentIndex = i;
+			break;
+		}
+	}
+
+	std::string selection = selectItem(currentIndex, availableItems);
 
 	for(unsigned int i=0;i<strings.size();i++) {
 		if(strings[i] == selection)	return T(i);

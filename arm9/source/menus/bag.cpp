@@ -220,8 +220,17 @@ void editBag(void) {
 				for(unsigned i = 0; i < save->validItems()[save->pouches()[selectedPouch].first].size(); i++) {
 					validItems.push_back(i18n::item(Config::getLang("lang"),
 													save->validItems()[save->pouches()[selectedPouch].first][i]));
-					if(save->validItems()[save->pouches()[selectedPouch].first][i] == item->id()) {
-						currentItem = i + 1;
+				}
+
+				// Sort items alphabetically (excluding index 0 'None'), except TM pouch which stays numeric
+				if(save->pouches()[selectedPouch].first != pksm::Sav::Pouch::TM && validItems.size() > 2) {
+					std::sort(validItems.begin() + 1, validItems.end(), i18n::compareAlphabetical);
+				}
+
+				for(unsigned i = 0; i < validItems.size(); i++) {
+					if(validItems[i] == itemName(save->item(save->pouches()[selectedPouch].first, selection))) {
+						currentItem = i;
+						break;
 					}
 				}
 
@@ -282,7 +291,7 @@ void editBag(void) {
 		else if(column == 1)
 			setSpritePosition(arrowID,
 							  false,
-							  30 + getTextWidth(itemName(save->item(save->pouches()[selectedPouch].first, selection))) +
+							  30 + getTextWidthMaxW(itemName(save->item(save->pouches()[selectedPouch].first, selection)), 127) +
 								  2,
 							  (16 * (selection - screenPos) + 10));
 		updateOam();

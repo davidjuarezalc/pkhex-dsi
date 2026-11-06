@@ -67,29 +67,29 @@ void init(int argc, char **argv) {
 
 	// Try to init NitroFS from argv provided to the app when it was launched
 	if(!nitroFSInit(nullptr)) {
-		// If that fails, try to init NitroFS on 'pkmn-chest.nds'
-		if(!nitroFSInit("pkmn-chest.nds") || !nitroFSGood()) {
-			// If that fails, try '/_nds/pkmn-chest/pkmn-chest.nds'
-			if(!nitroFSInit("/_nds/pkmn-chest/pkmn-chest.nds")) {
-				// Print error that nitroFSInit() failed
-				consoleDemoInit();
-				printf("nitroFSInit() failed...\n\n");
-				printf("Please copy pkmn-chest.nds to:\n\n");
-				printf("%s:/_nds/pkmn-chest/\n", mainDrive().c_str());
-				printf("                  pkmn-chest.nds\n\n");
-				printf("or launch pkmn-chest using\n\n");
-				printf("      TWiLight Menu++ or HBMenu\n\n\n\n\n");
-				while(1)
-					swiWaitForVBlank();
-			} else if(!nitroFSGood()) {
-				// Print error that the NitroFS was out of date
-				consoleDemoInit();
-				printf("NitroFS is out of date!\n\n");
-				printf("Please update pkmn-chest.nds at:\n\n");
-				printf("%s:/_nds/pkmn-chest/\n", mainDrive().c_str());
-				while(1)
-					swiWaitForVBlank();
-			}
+		// Try pkhex_dsi.nds, pkmn-chest.nds, and standard fallback locations
+		if((!nitroFSInit("pkhex_dsi.nds") || !nitroFSGood()) &&
+		   (!nitroFSInit("/_nds/pkmn-chest/pkhex_dsi.nds") || !nitroFSGood()) &&
+		   (!nitroFSInit("pkmn-chest.nds") || !nitroFSGood()) &&
+		   (!nitroFSInit("/_nds/pkmn-chest/pkmn-chest.nds") || !nitroFSGood())) {
+			// Print error that nitroFSInit() failed
+			consoleDemoInit();
+			printf("nitroFSInit() failed...\n\n");
+			printf("Please copy pkhex_dsi.nds to:\n\n");
+			printf("%s:/_nds/pkmn-chest/\n", mainDrive().c_str());
+			printf("                  pkhex_dsi.nds\n\n");
+			printf("or launch it using\n\n");
+			printf("      TWiLight Menu++ or HBMenu\n\n\n\n\n");
+			while(1)
+				swiWaitForVBlank();
+		} else if(!nitroFSGood()) {
+			// Print error that the NitroFS was out of date
+			consoleDemoInit();
+			printf("NitroFS is out of date!\n\n");
+			printf("Please update pkhex_dsi.nds at:\n\n");
+			printf("%s:/_nds/pkmn-chest/\n", mainDrive().c_str());
+			while(1)
+				swiWaitForVBlank();
 		}
 	}
 
@@ -106,7 +106,9 @@ void init(int argc, char **argv) {
 	i18n::removeCallbacks(i18n::initForm, i18n::exitForm);
 	i18n::removeCallbacks(i18n::initType, i18n::exitType);
 	i18n::removeCallbacks(i18n::initGeo, i18n::exitGeo);
+	i18n::removeCallbacks(i18n::initRibbon, i18n::exitRibbon);
 	i18n::init(Config::getLang("lang"));
+	i18n::updateTMHMNames(Config::getLang("lang"));
 
 	printTextCentered(i18n::localize(Config::getLang("lang"), "loading"), 0, 32, false, true);
 

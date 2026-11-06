@@ -13,7 +13,7 @@
 char slot2Name[13];
 char slot2ID[5];
 
-const std::vector<std::string> goodTids = {
+static const char *const goodTids[] = {
 	"AXP", // Sapphire
 	"AXV", // Ruby
 	"BPE", // Emerald
@@ -22,8 +22,8 @@ const std::vector<std::string> goodTids = {
 };
 
 bool isValidGBATid(char *tid) {
-	for(unsigned i = 0; i < goodTids.size(); i++) {
-		if(strncmp(tid, goodTids[i].c_str(), 3) == 0)
+	for(unsigned i = 0; i < sizeof(goodTids) / sizeof(goodTids[0]); i++) {
+		if(strncmp(tid, goodTids[i], 3) == 0)
 			return true;
 	}
 	return false;
@@ -33,7 +33,7 @@ bool updateCartInfo(void) {
 	strncpy(slot2Name, (char *)0x080000A0, sizeof(slot2Name) - 1);
 	slot2Name[sizeof(slot2Name) - 1] = '\0';
 	strncpy(slot2ID, (char *)0x080000AC, sizeof(slot2ID) - 1);
-	slot2Name[sizeof(slot2Name) - 1] = '\0';
+	slot2ID[sizeof(slot2ID) - 1] = '\0';
 
 	return true;
 }

@@ -29,7 +29,7 @@ Text textTP1[]{
 	{4, 144},
 };
 
-std::vector<std::string> trainerText = {
+static const char *const trainerText[] = {
 	"name", "trainerID", "secretID", "money", "bp", "badges", "playTime", "rtcInitial", "rtcElapsed"};
 
 void drawTrainerCard(void) {

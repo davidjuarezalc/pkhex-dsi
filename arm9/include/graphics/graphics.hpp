@@ -30,7 +30,7 @@ struct Sprite {
 struct Label {
 	int x;
 	int y;
-	std::string label;
+	const char *label;
 };
 
 extern int bg3Main, bg2Main, bg3Sub, bg2Sub, bg1Sub;

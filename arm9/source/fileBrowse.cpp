@@ -26,11 +26,9 @@
 
 #define ENTRIES_PER_SCREEN 11
 #define ENTRY_PAGE_LENGTH 10
-#define copyBufSize 0x8000
 
 char fatLabel[14];
 char sdLabel[14];
-u32 copyBuf[copyBufSize];
 
 struct topMenuItem {
 	std::string name;
@@ -325,6 +323,9 @@ std::string topMenuSelect(void) {
 			line[strlen(line) - 1] = '\0'; // Remove newline
 			topMenuContents.push_back({line, (access(line, F_OK) == 0)});
 		}
+		if(line)
+			free(line);
+		fclose(favs);
 	}
 
 	int cardWait = 0;
@@ -517,7 +518,7 @@ std::string browseForFile(const std::vector<std::string> &extensionList,
 		if(held & KEY_UP) {
 			if(fileOffset > 0)
 				fileOffset -= 1;
-			else
+			else if(!dirContents.empty())
 				fileOffset = dirContents.size() - 1;
 		} else if(held & KEY_DOWN) {
 			if(fileOffset < (int)dirContents.size() - 1)
@@ -531,9 +532,11 @@ std::string browseForFile(const std::vector<std::string> &extensionList,
 		} else if(held & KEY_RIGHT) {
 			fileOffset += ENTRY_PAGE_LENGTH;
 			if(fileOffset > (int)dirContents.size() - 1)
-				fileOffset = dirContents.size() - 1;
+				fileOffset = dirContents.empty() ? 0 : (int)dirContents.size() - 1;
 		} else if(pressed & KEY_A) {
 		selection:
+			if(dirContents.empty())
+				continue;
 			DirEntry *entry = &dirContents.at(fileOffset);
 			if(entry->isDirectory && !canChooseDirs) {
 				// Don't go up directory if in the start directory
@@ -576,17 +579,23 @@ std::string browseForFile(const std::vector<std::string> &extensionList,
 			showDirectoryContents(dirContents, screenOffset);
 		} else if(pressed & KEY_Y &&
 				  accessSubdirectories) { // accessSubdirectory is to make it not trigger except in save selection
-			if(dirContents[fileOffset].isDirectory || loadSave(dirContents[fileOffset].name)) {
+			if(!dirContents.empty() && (dirContents[fileOffset].isDirectory || loadSave(dirContents[fileOffset].name))) {
 				Sound::play(Sound::click);
 				char path[PATH_MAX];
 				getcwd(path, PATH_MAX);
 
+				std::string fullFavPath = path;
+				if(!fullFavPath.empty() && fullFavPath.back() != '/')
+					fullFavPath += '/';
+				fullFavPath += dirContents[fileOffset].name;
+
 				FILE *favs = fopen((mainDrive() + ":/_nds/pkmn-chest/favorites.lst").c_str(), "ab");
 
 				if(favs) {
-					fwrite((path + dirContents[fileOffset].name + "\n").c_str(),
+					fullFavPath += "\n";
+					fwrite(fullFavPath.c_str(),
 						   1,
-						   (path + dirContents[fileOffset].name + "\n").size(),
+						   fullFavPath.size(),
 						   favs);
 					fclose(favs);
 				}
@@ -644,7 +653,21 @@ std::string browseForSave(void) {
 		snprintf(sav, sizeof(sav), "sav%i", i);
 		extensionList.push_back(sav);
 	}
-	return browseForFile(extensionList, true);
+	std::string selectedFile = browseForFile(extensionList, true);
+	if(selectedFile.empty() || selectedFile == "%EXIT%")
+		return selectedFile;
+
+	// If already an absolute or device path (e.g. cardSave, cartSave, or from favorites), return directly
+	if(selectedFile.find(':') != std::string::npos || selectedFile[0] == '/')
+		return selectedFile;
+
+	char cwd[PATH_MAX];
+	getcwd(cwd, PATH_MAX);
+	std::string fullPath = cwd;
+	if(!fullPath.empty() && fullPath.back() != '/')
+		fullPath += '/';
+	fullPath += selectedFile;
+	return fullPath;
 }
 
 int fcopy(const char *sourcePath, const char *destinationPath) {
@@ -665,19 +688,31 @@ int fcopy(const char *sourcePath, const char *destinationPath) {
 		}
 
 		FILE *destinationFile = fopen(destinationPath, "wb");
-		fseek(destinationFile, 0, SEEK_SET);
+		if(!destinationFile) {
+			fclose(sourceFile);
+			return -1;
+		}
+
+		constexpr size_t copyBufBytes = 16384;
+		std::unique_ptr<u8[]> copyBuf(new(std::nothrow) u8[copyBufBytes]);
+		if(!copyBuf) {
+			fclose(sourceFile);
+			fclose(destinationFile);
+			return -1;
+		}
 
 		off_t offset = 0;
 		drawOutline(5, 39, 247, 18, DARKERER_GRAY, false, true);
 		while(1) {
 			drawRectangle(
 				((offset < fsize ? (float)offset / fsize : 1) * 226) + 6, 40, 19, 16, LIGHT_GRAY, false, true);
-			// Copy file to destination path
-			int numr = fread(copyBuf, 2, copyBufSize, sourceFile);
-			fwrite(copyBuf, 2, numr, destinationFile);
-			offset += copyBufSize;
+			size_t numr = fread(copyBuf.get(), 1, copyBufBytes, sourceFile);
+			if(numr > 0) {
+				fwrite(copyBuf.get(), 1, numr, destinationFile);
+			}
+			offset += numr;
 
-			if(offset > fsize) {
+			if(numr == 0 || offset >= fsize) {
 				fclose(sourceFile);
 				fclose(destinationFile);
 

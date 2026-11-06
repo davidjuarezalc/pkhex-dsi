@@ -52,10 +52,10 @@ struct Text {
 		{100, 100},
 	};
 
-std::vector<std::string> statsLabels = {
+static const char * const statsLabels[] = {
 	"hp", "attack", "defense", "spAtk", "spDef", "speed", "base", "iv", "ev", "total"
 };
-std::vector<std::string> originLabels = {
+static const char * const originLabels[] = {
 	"metLevel", "metYear", "metMonth", "metDay", "metLocation", "originGame", "fatefulEncounter", "egg"
 };
 
@@ -250,16 +250,26 @@ void drawItemList(int screenPos, const std::vector<std::string> &itemList, bool 
 	drawRectangle(0, 0, 256, 192, CLEAR, false, true);
 
 	// Print items
-	for(unsigned i = 0; i < std::min(9u, itemList.size() - screenPos); i++) {
-		printText(itemList[screenPos + i], 4, 4 + (i * 20), false, true);
+	if(screenPos >= 0 && screenPos < (int)itemList.size()) {
+		for(unsigned i = 0; i < std::min(9u, (unsigned)(itemList.size() - screenPos)); i++) {
+			printTextMaxW(itemList[screenPos + i], 240, 1.0f, 4, 4 + (i * 20), false, true);
+		}
 	}
 }
 
 std::string selectItem(int current, const std::vector<std::string> &strings) {
+	if(strings.empty())
+		return "";
+
+	if(current < 0)
+		current = 0;
+	else if(current >= (int)strings.size())
+		current = strings.size() - 1;
+
 	std::vector<std::string> itemList = strings;
 
 	// Set arrow position
-	setSpritePosition(arrowID, false, 4 + getTextWidth(strings[current]), -2);
+	setSpritePosition(arrowID, false, 4 + getTextWidthMaxW(strings[current], 240), -2);
 	setSpriteVisibility(arrowID, false, true);
 	updateOam();
 
@@ -279,7 +289,7 @@ std::string selectItem(int current, const std::vector<std::string> &strings) {
 		if(held & KEY_UP) {
 			if(newMove > 0)
 				newMove--;
-			else
+			else if(!itemList.empty())
 				newMove = itemList.size() - 1;
 		} else if(held & KEY_DOWN) {
 			if(newMove < (int)itemList.size() - 1)
@@ -293,29 +303,29 @@ std::string selectItem(int current, const std::vector<std::string> &strings) {
 		} else if(held & KEY_RIGHT) {
 			newMove += entriesPerScreen;
 			if(newMove > (int)itemList.size() - 1)
-				newMove = itemList.size() - 1;
+				newMove = itemList.empty() ? 0 : itemList.size() - 1;
 		} else if(pressed & KEY_A) {
 			Sound::play(Sound::click);
-			for(unsigned int i = 0; i < strings.size(); i++) {
-				drawRectangle(0, 0, 256, 192, CLEAR, false, true);
+			drawRectangle(0, 0, 256, 192, CLEAR, false, true);
+			if(!itemList.empty() && newMove >= 0 && newMove < (int)itemList.size())
 				return itemList[newMove];
-			}
+			return strings[current];
 		}
 		if(pressed & KEY_B) {
 			drawRectangle(0, 0, 256, 192, CLEAR, false, true);
 			Sound::play(Sound::back);
-			return itemList[current];
+			return strings[current];
 		} else if(pressed & KEY_TOUCH) {
 			touchRead(&touch);
 			if(touch.px >= 256 - search.width && touch.py <= search.height) {
 				goto search;
 			}
 			for(int i = 0; i < entriesPerScreen; i++) {
-				if(touch.px >= 4 && touch.px <= 4 + getTextWidth(itemList[screenPos + i]) && touch.py >= 4 + (i * 20) &&
+				if(screenPos + i < (int)itemList.size() &&
+				   touch.px >= 4 && touch.px <= 4 + getTextWidthMaxW(itemList[screenPos + i], 240) && touch.py >= 4 + (i * 20) &&
 				   touch.py <= 4 + ((i + 1) * 20)) {
 					drawRectangle(0, 0, 256, 192, CLEAR, false, true);
 					return itemList[screenPos + i];
-					break;
 				}
 			}
 		} else if(pressed & KEY_Y) {
@@ -326,8 +336,10 @@ std::string selectItem(int current, const std::vector<std::string> &strings) {
 			itemList.clear();
 			if(str != "")
 				itemList.push_back("-----");
+			std::string normQuery = i18n::normalizeForSort(str);
 			for(int i = 0; i < (int)strings.size(); i++) {
-				if(strncasecmp(str.c_str(), strings[i].c_str(), str.length()) == 0) {
+				std::string normTarget = i18n::normalizeForSort(strings[i]);
+				if(normTarget.find(normQuery) != std::string::npos) {
 					itemList.push_back(strings[i]);
 				}
 			}
@@ -348,7 +360,9 @@ std::string selectItem(int current, const std::vector<std::string> &strings) {
 		}
 
 		// Move cursor
-		setSpritePosition(arrowID, false, 4 + getTextWidth(itemList[newMove]), (20 * (newMove - screenPos) - 2));
+		if(!itemList.empty() && newMove >= 0 && newMove < (int)itemList.size()) {
+			setSpritePosition(arrowID, false, 4 + getTextWidthMaxW(itemList[newMove], 240), (20 * (newMove - screenPos) - 2));
+		}
 		updateOam();
 	}
 }
@@ -839,7 +853,7 @@ void drawOriginPage(const pksm::PKX &pkm, std::vector<std::string> &varText) {
 		pkm.egg() ? i18n::localize(Config::getLang("lang"), "yes") : i18n::localize(Config::getLang("lang"), "no"),
 	};
 	printText(i18n::localize(Config::getLang("lang"), "origin"), 4, 0, false, true);
-	for(unsigned i = 0; i < originLabels.size(); i++) {
+	for(unsigned i = 0; i < (sizeof(originLabels) / sizeof(originLabels[0])); i++) {
 		printText(
 			i18n::localize(Config::getLang("lang"), originLabels[i]) + ": " + varText[i], 4, (i + 1) * 16, false, true);
 	}
@@ -871,7 +885,7 @@ void selectOrigin(pksm::PKX &pkm) {
 			if(selection > 0)
 				selection--;
 		} else if(held & KEY_DOWN) {
-			if(selection < (int)originLabels.size() - 1)
+			if(selection < (int)(sizeof(originLabels) / sizeof(originLabels[0])) - 1)
 				selection++;
 		} else if(pressed & KEY_A) {
 			optionSelected = true;
@@ -881,7 +895,7 @@ void selectOrigin(pksm::PKX &pkm) {
 		} else if(pressed & KEY_TOUCH) {
 			touchPosition touch;
 			touchRead(&touch);
-			for(unsigned i = 0; i < originLabels.size(); i++) {
+			for(unsigned i = 0; i < (sizeof(originLabels) / sizeof(originLabels[0])); i++) {
 				if(touch.py > 16 + (i * 16) && touch.py < 16 + (i + 1) * 16) {
 					selection      = i;
 					optionSelected = true;
@@ -1178,8 +1192,8 @@ void selectStats(pksm::PKX &pkm) {
 		} else if(pressed & KEY_TOUCH) {
 			touchRead(&touch);
 			for(unsigned i = 0; i < (sizeof(textStatsC2) / sizeof(textStatsC2[0])); i++) {
-				if(touch.px >= 128 + (textStatsC2[selection].x - (getTextWidth(textStatsC2[selection].text) / 2)) &&
-				   touch.px <= 128 + (textStatsC2[selection].x + (getTextWidth(textStatsC2[selection].text) / 2)) &&
+				if(touch.px >= 128 + (textStatsC2[i].x - (getTextWidth(textStatsC2[i].text) / 2)) &&
+				   touch.px <= 128 + (textStatsC2[i].x + (getTextWidth(textStatsC2[i].text) / 2)) &&
 				   touch.py >= textStatsC2[i].y && touch.py <= textStatsC2[i].y + 16) {
 					column         = 0;
 					selection      = i;
@@ -1188,8 +1202,8 @@ void selectStats(pksm::PKX &pkm) {
 				}
 			}
 			for(unsigned i = 0; i < (sizeof(textStatsC3) / sizeof(textStatsC3[0])); i++) {
-				if(touch.px >= 128 + (textStatsC3[selection].x - (getTextWidth(textStatsC3[selection].text) / 2)) &&
-				   touch.px <= 128 + (textStatsC3[selection].x + (getTextWidth(textStatsC3[selection].text) / 2)) &&
+				if(touch.px >= 128 + (textStatsC3[i].x - (getTextWidth(textStatsC3[i].text) / 2)) &&
+				   touch.px <= 128 + (textStatsC3[i].x + (getTextWidth(textStatsC3[i].text) / 2)) &&
 				   touch.py >= textStatsC3[i].y && touch.py <= textStatsC3[i].y + 16) {
 					column         = 1;
 					selection      = i;
@@ -1274,7 +1288,10 @@ pksm::Type selectHPType(pksm::Type type) {
 	}
 	updateOam();
 
-	u8 currentType = u8(type) - 1;
+	u8 currentType = 0;
+	if(type >= pksm::Type::Fighting && type <= pksm::Type::Dark) {
+		currentType = u8(type) - 1;
+	}
 	int arrowX = currentType - ((currentType / 4) * 4), selection = currentType / 4, pressed, held;
 	// Move arrow to current wallpaper
 	setSpriteVisibility(arrowID, false, true);

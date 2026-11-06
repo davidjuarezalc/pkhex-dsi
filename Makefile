@@ -1,16 +1,16 @@
 
 BLOCKSDS	?= /opt/blocksds/core
 
-NAME	:= pkmn-chest
+NAME	:= pkhex_dsi
 
 # specify a directory which contains the nitro filesystem
 # this is relative to the Makefile
 NITROFSDIR		:= nitrofiles
 
 # These set the information text in the nds file
-GAME_TITLE		:= Pokemon Chest
-GAME_SUBTITLE	:= 
-GAME_AUTHOR 	:= Universal-Team
+GAME_TITLE		:= PKHeX DSi
+GAME_SUBTITLE	:= Editor de Pokemon
+GAME_AUTHOR 	:= David
 GAME_ICON 		:= icon.png
 
 SOURCEDIRS	:= arm9/source arm9/core/source arm9/core/memecrypto
@@ -108,7 +108,7 @@ $(NAME).dsi	:	graphics sound lang $(NITRO_FILES) $(ELF)
 
 #---------------------------------------------------------------------------------
 $(NAME).cia	:	$(NAME).dsi $(ELF)
-	make_cia --srl="pkmn-chest.dsi"
+	make_cia --srl="$(NAME).dsi"
 
 dsi	:	$(NAME).dsi
 cia	:	$(NAME).cia

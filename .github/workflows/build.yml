@@ -1,166 +1,88 @@
-name: Build pkmn-chest
+name: Build and Release PKHeX DSi
 
 on:
   push:
-    branches-ignore: [translation]
     paths-ignore:
-      - 'README.md'
+      - 'README*.md'
+      - 'CHANGELOG.md'
+      - '.gitignore'
   pull_request:
-    branches: ["*"]
     paths-ignore:
-      - 'README.md'
+      - 'README*.md'
+      - 'CHANGELOG.md'
+      - '.gitignore'
   release:
     types: [published]
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ startsWith(github.ref, 'refs/pull') && github.ref || 'publish' }}
+  group: ci-${{ startsWith(github.ref, 'refs/pull') && github.ref || github.sha }}
+  cancel-in-progress: true
 
 jobs:
   build:
+    name: Build .nds with BlocksDS
     runs-on: ubuntu-latest
     container: skylyrac/blocksds:slim-v1.18.0
-    name: Build with Docker using blocksds
-    outputs:
-      commit_tag: ${{ steps.build.outputs.commit_tag }}
-      commit_hash: ${{ steps.build.outputs.commit_hash }}
-      author_name: ${{ steps.build.outputs.author_name }}
-      committer_name: ${{ steps.build.outputs.committer_name }}
-      commit_subject: ${{ steps.build.outputs.commit_subject }}
-      commit_message: ${{ steps.build.outputs.commit_message }}
+
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           fetch-depth: 0
+
       - name: Setup environment
         run: git config --global safe.directory '*'
-      - name: Install tools
+
+      - name: Install graphics conversion tool (bmp2ds)
         run: |
-          curl -L https://github.com/Universal-Team/bmp2ds/releases/download/v1.0.0/bmp2ds-linux -o bmp2ds
-          chmod +x bmp2ds
-          mv bmp2ds /usr/local/bin
-      - name: Build
-        id: build
+          curl -sL https://raw.githubusercontent.com/Universal-Team/bmp2ds/master/bmp2ds.cpp -o /tmp/bmp2ds.cpp
+          g++ -O2 /tmp/bmp2ds.cpp -o /usr/local/bin/bmp2ds
+          rm /tmp/bmp2ds.cpp
+          chmod +x /usr/local/bin/bmp2ds
+
+      - name: Compile PKHeX DSi
         run: |
-          make -j $(nproc)
+          make -j$(nproc)
+          mkdir -p artifacts
+          cp -f pkhex_dsi.nds artifacts/ 2>/dev/null || cp -f pkmn-chest.nds artifacts/pkhex_dsi.nds
 
-          mv tools-linux/make_cia /usr/local/bin
-          make cia
-
-          mkdir -p ~/artifacts
-          cp pkmn-chest.* ~/artifacts
-
-          echo ::set-output name=commit_tag::$(git describe --abbrev=0 --tags --exclude git)
-          echo ::set-output name=commit_hash::$(git log --format=%h -1)
-
-          # Webhook info
-          echo "::set-output name=author_name::$(git log -1 $GITHUB_SHA --pretty=%aN)"
-          echo "::set-output name=committer_name::$(git log -1 $GITHUB_SHA --pretty=%cN)"
-          echo "::set-output name=commit_subject::$(git log -1 $GITHUB_SHA --pretty=%s)"
-          echo "::set-output name=commit_message::$(git log -1 $GITHUB_SHA --pretty=%b)"
-      - name: Publish build to GH Actions
-        uses: actions/upload-artifact@v4
-        with:
-          path: ~/artifacts/*
-          name: build
-
-  # Only run this for non-PR jobs.
-  publish_build:
-    runs-on: ubuntu-latest
-    name: Publish build
-    if: ${{ success() && !startsWith(github.ref, 'refs/pull') }}
-    needs: build
-    env:
-      COMMIT_TAG: ${{ needs.build.outputs.commit_tag }}
-      COMMIT_HASH: ${{ needs.build.outputs.commit_hash }}
-      AUTHOR_NAME: ${{ needs.build.outputs.author_name }}
-      COMMIT_SUBJECT: ${{ needs.build.outputs.commit_subject }}
-      COMMIT_MESSAGE: ${{ needs.build.outputs.commit_message }}
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build
-          path: build
-        # This one always runs
-      - name: Delete the 'git' release
-        run: |
-          # Get the release ID for tag 'git'
-          AUTH_HEADER="Authorization: token ${{ secrets.GITHUB_TOKEN }}"
-          CONTENT_TYPE="Content-Type: application/json"
-          API_URL="https://api.github.com/repos/${{ github.repository }}/releases/tags/git"
-
-          RESPONSE=$(curl -H "$AUTH_HEADER" -H "$CONTENT_TYPE" "$API_URL")
-          STATUS=$(echo $RESPONSE | jq -r .status)
-          if [ "$STATUS" != "404" ]; then
-            # If it exists, delete it
-            ID=$(echo $RESPONSE | jq -r .id)
-            API_URL="https://api.github.com/repos/${{ github.repository }}/releases/$ID"
-            curl -XDELETE -H "$AUTH_HEADER" -H "$CONTENT_TYPE" "$API_URL"
+          if [ -f tools-linux/make_cia ]; then
+            cp tools-linux/make_cia /usr/local/bin/
+            chmod +x /usr/local/bin/make_cia
+            make cia || true
+            if [ -f pkhex_dsi.cia ]; then
+              cp -f pkhex_dsi.cia artifacts/
+            elif [ -f pkmn-chest.cia ]; then
+              cp -f pkmn-chest.cia artifacts/pkhex_dsi.cia
+            fi
           fi
 
-        # This one only runs for releases
-      - name: Upload to ${{ github.ref_name }} release
-        if: ${{ startsWith(github.ref, 'refs/tags') }}
-        run: |
-          ID=$(jq -r '.release.id' $GITHUB_EVENT_PATH)
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkhex-dsi-build
+          path: artifacts/*
+          if-no-files-found: error
 
-          for file in ${{ github.workspace }}/build/*; do
-            AUTH_HEADER="Authorization: token ${{ secrets.GITHUB_TOKEN }}"
-            CONTENT_LENGTH="Content-Length: $(stat -c%s $file)"
-            CONTENT_TYPE="Content-Type: application/7z-x-compressed"
-            UPLOAD_URL="https://uploads.github.com/repos/${{ github.repository }}/releases/$ID/assets?name=$(basename $file)"
-
-            curl -XPOST -H "$AUTH_HEADER" -H "$CONTENT_LENGTH" -H "$CONTENT_TYPE" --upload-file "$file" "$UPLOAD_URL"
-          done
-        
-        # This one only runs if it's not a release run
-      - name: Upload to 'git' release
-        if: ${{ !startsWith(github.ref, 'refs/tags') }}
-        run: |
-          AUTH_HEADER="Authorization: token ${{ secrets.GITHUB_TOKEN }}"
-          CONTENT_TYPE="Content-Type: application/json"
-          API_URL="https://api.github.com/repos/${{ github.repository }}/releases"
-          RELEASE_INFO="{\"tag_name\": \"git\", \"name\": \"Continuous Build - $COMMIT_HASH\", \"body\": \"$AUTHOR_NAME - $COMMIT_SUBJECT\n\n$COMMIT_MESSAGE\", \"prerelease\": true}"
-
-          RESPONSE=$(curl -XPOST -H "$AUTH_HEADER" -H "$CONTENT_TYPE" "$API_URL" -d "$RELEASE_INFO")
-          ID=$(echo $RESPONSE | jq -r '.id')
-
-          for file in ${{ github.workspace }}/build/*; do
-            CONTENT_LENGTH="Content-Length: $(stat -c%s $file)"
-            CONTENT_TYPE="Content-Type: application/7z-x-compressed"
-            UPLOAD_URL="https://uploads.github.com/repos/${{ github.repository }}/releases/$ID/assets?name=$(basename $file)"
-
-            curl -XPOST -H "$AUTH_HEADER" -H "$CONTENT_LENGTH" -H "$CONTENT_TYPE" --upload-file "$file" "$UPLOAD_URL"
-          done
-
-  send_success_webhook:
+  release:
+    name: Publish Release Assets
     runs-on: ubuntu-latest
-    needs: [publish_build, build]
-    name: Send success webhook
-    if: ${{ !startsWith(github.ref, 'refs/pull') && success() }}
-    env:
-      COMMIT_HASH: ${{ needs.build.outputs.commit_hash }}
-      AUTHOR_NAME: ${{ needs.build.outputs.author_name }}
-      COMMITTER_NAME: ${{ needs.build.outputs.committer_name }}
-      COMMIT_SUBJECT: ${{ needs.build.outputs.commit_subject }}
-      COMMIT_MESSAGE: ${{ needs.build.outputs.commit_message }}
+    needs: build
+    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
     steps:
-      - name: Send success webhook
-        run: |
-          curl -o send.sh https://raw.githubusercontent.com/Universal-Team/discord-webhooks/master/send-ghactions.sh
-          chmod +x send.sh
-          ./send.sh success ${{ secrets.WEBHOOK_URL }}
-  send_failure_webhook:
-    runs-on: ubuntu-latest
-    needs: [publish_build, build]
-    name: Send failure webhook
-    if: ${{ !startsWith(github.ref, 'refs/pull') && failure() }}
-    steps:
-      - name: Send failure webhook
-        run: |
-          curl -o send.sh https://raw.githubusercontent.com/Universal-Team/discord-webhooks/master/send-ghactions.sh
-          chmod +x send.sh
-          ./send.sh failure ${{ secrets.WEBHOOK_URL }}
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: pkhex-dsi-build
+          path: release_assets
+
+      - name: Upload Binaries to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release_assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

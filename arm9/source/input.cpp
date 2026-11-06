@@ -1085,7 +1085,8 @@ std::string Input::getLine(unsigned maxLength) {
 			drawRectangle(0, 192 - keyboard.height - 16, 256, 16, DARKERER_GRAY, false, true);
 			printText(string, 0, 192 - keyboard.height - 16, false, true);
 		} else if(held & KEY_Y) {
-			addToString(u' ');
+			if(string.size() < maxLength)
+				addToString(u' ');
 			drawRectangle(0, 192 - keyboard.height - 16, 256, 16, DARKERER_GRAY, false, true);
 			printText(string, 0, 192 - keyboard.height - 16, false, true);
 		}
@@ -1118,8 +1119,8 @@ int Input::getInt() { return Input::getInt(-1); }
 
 // Returns -1 if nothing entered
 int Input::getInt(unsigned max) {
-	char str[4];
-	__itoa(max, str, 10);
+	char str[16];
+	snprintf(str, sizeof(str), "%u", max);
 	unsigned maxLength = strlen(str);
 	clearVars();
 	drawKeyboard(0);
@@ -1171,10 +1172,14 @@ int Input::getInt(unsigned max) {
 	drawRectangle(0, 0, 256, 192, CLEAR, false, true);
 	if(string == u"")
 		return -1;
-	unsigned i = std::stoi(StringUtils::UTF16toUTF8(string));
-	if(i > max)
+	try {
+		unsigned long val = std::stoul(StringUtils::UTF16toUTF8(string));
+		if(val > max)
+			return max;
+		return (int)val;
+	} catch(...) {
 		return max;
-	return i;
+	}
 }
 
 bool Input::getBool() {

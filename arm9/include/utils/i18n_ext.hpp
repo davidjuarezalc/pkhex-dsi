@@ -12,6 +12,14 @@ namespace i18n {
 	void initGui(pksm::Language lang);
 	void exitGui(pksm::Language lang);
 	const std::string &localize(pksm::Language lang, const std::string &v);
+	const std::string &localize(pksm::Language lang, const char *v);
+
+	// Update TM/HM item names to include their moves
+	void updateTMHMNames(pksm::Language lang);
+
+	// Accent-insensitive and case-insensitive comparison for alphabetical sorting
+	bool compareAlphabetical(const std::string &a, const std::string &b);
+	std::string normalizeForSort(const std::string &s);
 }
 
 #endif

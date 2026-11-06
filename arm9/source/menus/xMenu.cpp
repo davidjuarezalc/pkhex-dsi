@@ -17,11 +17,12 @@
 #include "trainer.hpp"
 
 // clang-format off
-std::vector<Label> xMenuButtons = {
+static constexpr Label xMenuButtons[] = {
 	{2,  24, "party"}, {130,  24, "options"},
 	{2,  72,   "bag"}, {130,  72,        ""},
 	{2, 120,  "save"}, {130, 120,    "exit"},
 };
+static constexpr unsigned xMenuButtonsCount = sizeof(xMenuButtons) / sizeof(xMenuButtons[0]);
 // clang-format on
 
 void savePrompt(void) {
@@ -74,12 +75,10 @@ void savePrompt(void) {
 }
 
 void drawXMenuButtons(unsigned menuSelection) {
-	xMenuButtons[3].label = save->otName();
-
-	for(unsigned i = 0; i < xMenuButtons.size(); i++) {
+	for(unsigned i = 0; i < xMenuButtonsCount; i++) {
 		drawImage(xMenuButtons[i].x, xMenuButtons[i].y, menuSelection == i ? menuButtonBlue : menuButton, false, false);
 		if(i != 0) // skipping 0 (party) until I replace it with something
-			printText((i == 3) ? xMenuButtons[i].label : i18n::localize(Config::getLang("lang"), xMenuButtons[i].label),
+			printText((i == 3) ? save->otName() : i18n::localize(Config::getLang("lang"), xMenuButtons[i].label),
 					  xMenuButtons[i].x + 47,
 					  xMenuButtons[i].y + 14,
 					  false,
@@ -158,7 +157,7 @@ bool xMenu(void) {
 				menuSelection -= 2;
 			}
 		} else if(pressed & KEY_DOWN) {
-			if(menuSelection < (int)xMenuButtons.size() - 2) {
+			if(menuSelection < (int)xMenuButtonsCount - 2) {
 				setSpritePosition(menuIconID[menuSelection],
 								  false,
 								  xMenuButtons[menuSelection].x + 3,
@@ -192,7 +191,7 @@ bool xMenu(void) {
 			}
 		} else if(pressed & KEY_TOUCH) {
 			touchRead(&touch);
-			for(unsigned i = 0; i < xMenuButtons.size(); i++) {
+			for(unsigned i = 0; i < xMenuButtonsCount; i++) {
 				if(touch.px >= xMenuButtons[i].x && touch.px <= xMenuButtons[i].x + menuButton.width &&
 				   touch.py >= xMenuButtons[i].y && touch.py <= xMenuButtons[i].y + menuButton.height) {
 					selectedOption = i;

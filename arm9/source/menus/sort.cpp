@@ -16,10 +16,11 @@
 #include "sound.hpp"
 
 std::vector<SortType> sortTypes;
-std::vector<std::string> sortText = {
+static const char *const sortText[] = {
 	"none",   "dexNo", "speciesName", "form",   "type1",      "type2",     "hp",          "attack",  "defense",
 	"spAtk",  "spDef", "speed",       "hpIV",   "attackIV",   "defenseIV", "spAtkIV",     "spDefIV", "speedIV",
 	"nature", "level", "trainerID",   "hpType", "friendship", "name",      "origTrainer", "shiny"};
+static constexpr unsigned sortTextCount = sizeof(sortText) / sizeof(sortText[0]);
 
 bool sortPokemonFilter(const std::unique_ptr<pksm::PKX> &pkm1, const std::unique_ptr<pksm::PKX> &pkm2) {
 	for(const auto &type : sortTypes) {
@@ -79,9 +80,9 @@ bool sortPokemonFilter(const std::unique_ptr<pksm::PKX> &pkm1, const std::unique
 					return false;
 				break;
 			case SortType::SPE:
-				if(pkm1->stat(pksm::Stat::SPDEF) < pkm2->stat(pksm::Stat::SPD))
+				if(pkm1->stat(pksm::Stat::SPD) < pkm2->stat(pksm::Stat::SPD))
 					return true;
-				if(pkm2->stat(pksm::Stat::SPDEF) < pkm1->stat(pksm::Stat::SPD))
+				if(pkm2->stat(pksm::Stat::SPD) < pkm1->stat(pksm::Stat::SPD))
 					return false;
 				break;
 			case SortType::NATURE:
@@ -294,8 +295,8 @@ void sortMenu(bool top) {
 			for(unsigned i = 0; i < sortTypes.size(); i++) {
 				if(touch.px <= 4 +
 						   getTextWidth(i18n::localize(Config::getLang("lang"), "filter") + " " +
-										std::to_string(selection + 1) + ": " +
-										i18n::localize(Config::getLang("lang"), sortText[int(sortTypes[selection])])) &&
+										std::to_string(i + 1) + ": " +
+										i18n::localize(Config::getLang("lang"), sortText[int(sortTypes[i])])) &&
 				   touch.py >= 16 + (i * 16) && touch.py <= 16 + ((i + 1) * 16)) {
 					selection      = i;
 					optionSelected = true;
@@ -313,7 +314,7 @@ void sortMenu(bool top) {
 			Sound::play(Sound::click);
 			if(selection < (int)sortTypes.size()) {
 				std::vector<std::string> sortTextLocalized;
-				for(unsigned i = 0; i < sortText.size(); i++) {
+				for(unsigned i = 0; i < sortTextCount; i++) {
 					sortTextLocalized.push_back(i18n::localize(Config::getLang("lang"), sortText[i]));
 				}
 				sortTypes[selection] = selectItem(sortTypes[selection], 0, sortTextLocalized.size(), sortTextLocalized);

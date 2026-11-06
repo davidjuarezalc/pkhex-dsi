@@ -626,7 +626,7 @@ void manageBoxes(void) {
 			Sound::play(Sound::click);
 			if(arrowY == -1) {
 				if(heldPokemon.size() == 0)
-					aMenu(-1, -1, aMenuTopBarButtons, 1);
+					aMenu(-1, -1, aMenuTopBarButtons, 6, 1);
 			} else if(arrowY < 5) {
 				if(heldPokemon.size() > 0) {
 					if(heldPokemon[0].position == (arrowY * 6) + arrowX && heldPokemonBox == currentBox() &&
@@ -691,31 +691,41 @@ void manageBoxes(void) {
 										Banks::bank->pkm(*heldPokemon[i].pkm,
 														 currentBox(),
 														 ((arrowY + heldPokemon[i].y) * 6) + arrowX + heldPokemon[i].x);
-									} else if(inParty) {
-										save->pkm(*save->transfer(*heldPokemon[i].pkm),
-												  ((arrowY + heldPokemon[i].y) * 2) + arrowX + heldPokemon[i].x);
-										save->dex(*heldPokemon[i].pkm);
 									} else {
-										save->pkm(*save->transfer(*heldPokemon[i].pkm),
-												  currentBox(),
-												  ((arrowY + heldPokemon[i].y) * 6) + arrowX + heldPokemon[i].x,
-												  false);
-										save->dex(*heldPokemon[i].pkm);
+										auto transferred = save->transfer(*heldPokemon[i].pkm);
+										if(transferred) {
+											if(inParty) {
+												save->pkm(*transferred,
+														  ((arrowY + heldPokemon[i].y) * 2) + arrowX + heldPokemon[i].x);
+												save->dex(*heldPokemon[i].pkm);
+											} else {
+												save->pkm(*transferred,
+														  currentBox(),
+														  ((arrowY + heldPokemon[i].y) * 6) + arrowX + heldPokemon[i].x,
+														  false);
+												save->dex(*heldPokemon[i].pkm);
+											}
+										}
 									}
 									// If not copying, write the cursor position's previous Pokémon to the held
 									// Pokémon's old spot
 									if(!heldMode) {
 										if(heldPokemonScreen) {
 											Banks::bank->pkm(*tempPkm, heldPokemonBox, heldPokemon[i].position);
-										} else if(heldInParty) {
-											save->pkm(*save->transfer(*tempPkm), heldPokemon[i].position);
-											save->dex(*tempPkm);
 										} else {
-											save->pkm(*save->transfer(*tempPkm),
-													  heldPokemonBox,
-													  heldPokemon[i].position,
-													  false);
-											save->dex(*tempPkm);
+											auto transferred = save->transfer(*tempPkm);
+											if(transferred) {
+												if(heldInParty) {
+													save->pkm(*transferred, heldPokemon[i].position);
+													save->dex(*tempPkm);
+												} else {
+													save->pkm(*transferred,
+															  heldPokemonBox,
+															  heldPokemon[i].position,
+															  false);
+													save->dex(*tempPkm);
+												}
+											}
 										}
 									}
 								}
@@ -945,7 +955,7 @@ void manageBoxes(void) {
 					}
 				} else if(currentPokemon(arrowX, arrowY)->species() != pksm::Species::None) {
 					int temp = 1;
-					if(arrowMode == 1 || (temp = aMenu(arrowX, arrowY, aMenuButtons, 0))) {
+					if(arrowMode == 1 || (temp = aMenu(arrowX, arrowY, aMenuButtons, 6, 0))) {
 						// If no pokemon is currently held and there is one at the cursor, pick it up
 						heldPokemon.push_back(
 							{currentPokemon(arrowX, arrowY)->clone(), (arrowY * (inParty ? 2 : 6)) + arrowX, 0, 0});
@@ -970,7 +980,7 @@ void manageBoxes(void) {
 						drawPokemonInfo(*heldPokemon[0].pkm);
 					}
 				} else if(arrowMode == 0) {
-					aMenu(arrowX, arrowY, aMenuEmptySlotButtons, 2);
+					aMenu(arrowX, arrowY, aMenuEmptySlotButtons, 3, 2);
 				}
 			} else {
 			toggleParty:
